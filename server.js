@@ -66,10 +66,11 @@ app.get('/sendtgoud/:address/:amount', async (req, res) => {
 
 app.get('/buyhtg/:amount/:orderId', async (req, res) => {
   const { amount, orderId } = req.params
+
   const moncash = new Moncash({
     mode: 'live', // 'sandbox' | 'live'
-    clientId: 'f02614cbab79b1d59f47c972cfd808a6',
-    clientSecret: 'f_ShZb2h6YoMy8u0fbLU_qYS5njQTU8MiYbt31s9KuX022LntMPC91HiM6gcU9UD',
+    clientId: process.env.API_KEY_MONCASH,
+    clientSecret: process.env.SECRET_KEY_MONCASH,
   })
 
   moncash.payment.create(
