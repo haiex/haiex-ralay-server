@@ -19,6 +19,7 @@ require('dotenv').config()
 var port = process.env.PORT || 3002
 
 const ERC20_ADDRESS = '0x18C50Aad7f7450C49F2A0aF0aa097915358Cc004'
+const CELO_ADDRESS = '0x471EcE3750Da237f93B8E339c536989b8978a438'
 
 const credentials = {
   apiKey: process.env.API_KEY_CELO,
@@ -44,10 +45,10 @@ app.get('/sendgasfee/:address/:amount', async (req, res) => {
 app.get('/onboarding/:address', async (req, res) => {
   try {
     const { address } = req.params
-    const finalAmountFee = parseFloat(0.006) * 10 ** 18
+    const finalAmountFee = parseFloat(process.env.CELO_AMOUNT) * 10 ** 18
     const repFee = await sendGasFee(address, finalAmountFee.toString())
 
-    const finalAmountTgoud = parseFloat(0.5) * 10 ** 18
+    const finalAmountTgoud = parseFloat(process.env.TGOUD_AMOUNT) * 10 ** 18
 
     const repTgoud = await sendTgoud(address, finalAmountTgoud.toString())
 
@@ -90,15 +91,21 @@ app.get('/buyhtg/:amount/:orderId', async (req, res) => {
   )
 })
 
-async function sendGasFee(address, amount) {
+async function sendGasFee(recipient, amount) {
   const relayer = new Relayer(credentials)
+  var txRes
   try {
-    const txRes = await relayer.sendTransaction({
-      to: address,
-      value: amount,
-      speed: 'fast',
-      gasLimit: '21000',
-    })
+    const [from] = await web3.eth.getAccounts()
+    const erc20 = new web3.eth.Contract(ABITOKEN, CELO_ADDRESS, { from })
+    txRes = await erc20.methods.transfer(recipient, amount).send()
+    console.log(txRes)
+
+    // const txRes = await relayer.sendTransaction({
+    //   to: address,
+    //   value: amount,
+    //   speed: 'fast',
+    //   gasLimit: '21000',
+    // })
 
     return txRes
   } catch (error) {
@@ -113,7 +120,7 @@ async function sendTgoud(recipient, amount) {
   try {
     const [from] = await web3.eth.getAccounts()
     const erc20 = new web3.eth.Contract(ABIDAPP, ERC20_ADDRESS, { from })
-    txRes = await erc20.methods.sendHTG(from, recipient, '200000000000000000').send()
+    txRes = await erc20.methods.sendHTG(from, recipient, amount).send()
     console.log(txRes)
   } catch (error) {
     console.error(error)
