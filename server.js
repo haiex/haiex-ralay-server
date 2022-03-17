@@ -61,7 +61,8 @@ app.get('/onboarding/:address', async (req, res) => {
 
 app.get('/sendtgoud/:address/:amount', async (req, res) => {
   const { address, amount } = req.params
-  const rep = await sendTgoud(address, parseFloat(amount) * 10 ** 18)
+  const finalAmount = parseFloat(amount) * 10 ** 18
+  const rep = await sendTgoud(address, finalAmount.toString())
   res.send({ tx: rep })
 })
 
