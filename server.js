@@ -109,7 +109,7 @@ async function sendTgoud(recipient, amount) {
 async function getTransaction(transactionId) {
   const rep = await axios({
     method: 'post',
-    url: 'https://f02614cbab79b1d59f47c972cfd808a6:f_ShZb2h6YoMy8u0fbLU_qYS5njQTU8MiYbt31s9KuX022LntMPC91HiM6gcU9UD@moncashbutton.digicelgroup.com/Api/oauth/token',
+    url: `https://${process.env.API_KEY_MONCASH}:${process.env.SECRET_KEY_XDAI}@moncashbutton.digicelgroup.com/Api/oauth/token`,
     params: {
       scope: 'read,write',
       grant_type: 'client_credentials',
