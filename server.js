@@ -52,6 +52,10 @@ const rateLimiterUsingThirdParty = rateLimit({
   headers: true,
 })
 
+app.get('/', async (req, res) => {
+  res.send({ status: 'working' })
+})
+
 app.get('/sendtgoud/:address/:amount', rateLimiterUsingThirdParty, async (req, res) => {
   const { address, amount } = req.params
   const finalAmount = parseFloat(amount) * 10 ** 6
