@@ -63,6 +63,11 @@ app.get('/sendtgoud/:address/:amount', rateLimiterUsingThirdParty, async (req, r
   res.send(rep)
 })
 
+app.get('/cashout/:phone/:amount/:desc', rateLimiterUsingThirdParty, async (req, res) => {
+  const { phone, amount, desc } = req.params
+  const rep = await setTransaction(amount, phone, desc)
+  res.send(rep)
+})
 app.get('/getTransacion/:id', async (req, res) => {
   const { id } = req.params
   const rep = await getTransaction(id)
@@ -109,7 +114,7 @@ async function sendTgoud(recipient, amount) {
 async function getTransaction(transactionId) {
   const rep = await axios({
     method: 'post',
-    url: `https://${process.env.API_KEY_MONCASH}:${process.env.SECRET_KEY_XDAI}@moncashbutton.digicelgroup.com/Api/oauth/token`,
+    url: `https://${process.env.API_KEY_MONCASH}:${process.env.SECRET_KEY_MONCASH}@moncashbutton.digicelgroup.com/Api/oauth/token`,
     params: {
       scope: 'read,write',
       grant_type: 'client_credentials',
@@ -125,6 +130,27 @@ async function getTransaction(transactionId) {
     },
   })
   console.log(rep2.data)
+  return rep2.data
+}
+
+async function setTransaction(amount, recipient, description = '') {
+  const rep = await axios({
+    method: 'post',
+    url: `https://${process.env.API_KEY_MONCASH}:${process.env.SECRET_KEY_MONCASH}@moncashbutton.digicelgroup.com/Api/oauth/token`,
+    params: {
+      scope: 'read,write',
+      grant_type: 'client_credentials',
+    },
+  })
+
+  console.log(rep.data)
+  const rep2 = await axios({
+    method: 'post',
+    url: 'https://moncashbutton.digicelgroup.com/Api/v1/Transfert',
+    headers: { authorization: 'Bearer ' + rep.data.access_token },
+    data: { amount: amount, receiver: recipient, desc: description },
+  })
+
   return rep2.data
 }
 
