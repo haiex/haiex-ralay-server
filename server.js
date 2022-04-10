@@ -2,68 +2,67 @@ const express = require('express')
 var cors = require('cors')
 const axios = require('axios').default
 const Moncash = require('moncash')
-
-const { Relayer } = require('defender-relay-client')
-const { DefenderRelaySigner, DefenderRelayProvider } = require('defender-relay-client/lib/web3')
-const Web3 = require('web3')
-const { ethers } = require('ethers')
-const { ABIDAPP } = require('./ABIDAPP')
-const { ABITOKEN } = require('./ABITOKEN')
+const rateLimit = require('express-rate-limit')
+var cors = require('cors')
 
 const app = express()
 app.use(cors())
 app.use(express.urlencoded({ extended: true }))
 app.use(express.json())
+
+// var allowedOrigins = ['http://localhost:3000', 'https://app.kaitoken.fun']
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       // allow requests with no origin
+//       // (like mobile apps or curl requests)
+//       if (!origin) return callback(null, true)
+//       if (allowedOrigins.indexOf(origin) === -1) {
+//         var msg = 'The CORS policy for this site does not ' + 'allow access from the specified Origin.'
+//         return callback(new Error(msg), false)
+//       }
+//       return callback(null, true)
+//     },
+//   }),
+// )
+
 require('dotenv').config()
 
+const { ethers } = require('ethers')
+const { ABIDAPP } = require('./ABIDAPP')
+const { ABITOKEN } = require('./ABITOKEN')
+
+const provider_ = new ethers.providers.JsonRpcProvider('https://rpc.gnosischain.com')
+const wallet = new ethers.Wallet(process.env.PRIVATEKEY)
+const account = wallet.connect(provider_)
+console.log(account.address)
 var port = process.env.PORT || 3002
 
-const ERC20_ADDRESS = '0x18C50Aad7f7450C49F2A0aF0aa097915358Cc004'
-const CELO_ADDRESS = '0x471EcE3750Da237f93B8E339c536989b8978a438'
+const ERC20_ADDRESS = '0x21c8cd5371523Ca4362c7eb94aB0e1Aee7781766'
+const DAPP_ADDRESS = '0x67E66154BbC2cd1338657C32e7BA9E81E640523b'
 
-const credentials = {
-  apiKey: process.env.API_KEY_CELO,
-  apiSecret: process.env.SECRET_KEY_CELO,
-}
-const provider = new DefenderRelayProvider(credentials, { speed: 'fast' })
+const tgoudContract = new ethers.Contract(ERC20_ADDRESS, ABITOKEN, account)
+const dappContract = new ethers.Contract(DAPP_ADDRESS, ABIDAPP, account)
 
-const web3 = new Web3(provider)
-
-app.get('/sendgasfee/:address/:amount', async (req, res) => {
-  try {
-    const { address, amount } = req.params
-    const finalAmount = parseFloat(amount) * 10 ** 18
-    const rep = await sendGasFee(address, finalAmount.toString())
-
-    res.send({ tx: rep })
-  } catch (error) {
-    console.error(error)
-    res.send({ tx: error })
-  }
+//Implementing the rate limiter
+const rateLimiterUsingThirdParty = rateLimit({
+  windowMs: 30 * 1000, // 1 min in milliseconds
+  max: 1,
+  message: 'You have exceeded the 1 requests in 1 min limit!',
+  headers: true,
 })
 
-app.get('/onboarding/:address', async (req, res) => {
-  try {
-    const { address } = req.params
-    const finalAmountFee = parseFloat(process.env.CELO_AMOUNT) * 10 ** 18
-    const repFee = await sendGasFee(address, finalAmountFee.toString())
-
-    const finalAmountTgoud = parseFloat(process.env.TGOUD_AMOUNT) * 10 ** 18
-
-    const repTgoud = await sendTgoud(address, finalAmountTgoud.toString())
-
-    res.send({ txFee: repFee, txTgoud: repTgoud })
-  } catch (error) {
-    console.error(error)
-    res.send({ tx: error })
-  }
-})
-
-app.get('/sendtgoud/:address/:amount', async (req, res) => {
+app.get('/sendtgoud/:address/:amount', rateLimiterUsingThirdParty, async (req, res) => {
   const { address, amount } = req.params
-  const finalAmount = parseFloat(amount) * 10 ** 18
+  const finalAmount = parseFloat(amount) * 10 ** 6
   const rep = await sendTgoud(address, finalAmount.toString())
-  res.send({ tx: rep })
+  res.send(rep)
+})
+
+app.get('/getTransacion/:id', async (req, res) => {
+  const { id } = req.params
+  const rep = await getTransaction(id)
+  res.send(rep)
 })
 
 app.get('/buyhtg/:amount/:orderId', async (req, res) => {
@@ -92,44 +91,57 @@ app.get('/buyhtg/:amount/:orderId', async (req, res) => {
   )
 })
 
-async function sendGasFee(recipient, amount) {
-  const relayer = new Relayer(credentials)
-  var txRes
-  try {
-    const [from] = await web3.eth.getAccounts()
-    const erc20 = new web3.eth.Contract(ABITOKEN, CELO_ADDRESS, { from })
-    txRes = await erc20.methods.transfer(recipient, amount).send()
-    console.log(txRes)
-
-    // const txRes = await relayer.sendTransaction({
-    //   to: address,
-    //   value: amount,
-    //   speed: 'fast',
-    //   gasLimit: '21000',
-    // })
-
-    return txRes
-  } catch (error) {
-    console.error(error)
-    return null
-  }
-}
-
 async function sendTgoud(recipient, amount) {
-  var response
   var txRes
   try {
-    const [from] = await web3.eth.getAccounts()
-    const erc20 = new web3.eth.Contract(ABIDAPP, ERC20_ADDRESS, { from })
-    txRes = await erc20.methods.sendHTG(from, recipient, amount).send()
-    console.log(txRes)
+    const tx = await dappContract.sendHTG(account.address, recipient, amount)
+    txRes = await tx.wait()
   } catch (error) {
     console.error(error)
   }
-
   return txRes
 }
 
+async function getTransaction(transactionId) {
+  const rep = await axios({
+    method: 'post',
+    url: 'https://f02614cbab79b1d59f47c972cfd808a6:f_ShZb2h6YoMy8u0fbLU_qYS5njQTU8MiYbt31s9KuX022LntMPC91HiM6gcU9UD@moncashbutton.digicelgroup.com/Api/oauth/token',
+    params: {
+      scope: 'read,write',
+      grant_type: 'client_credentials',
+    },
+  })
+
+  const rep2 = await axios({
+    method: 'post',
+    url: 'https://moncashbutton.digicelgroup.com/Api/v1/RetrieveTransactionPayment',
+    headers: { authorization: 'Bearer ' + rep.data.access_token },
+    data: {
+      transactionId,
+    },
+  })
+  console.log(rep2.data)
+  return rep2.data
+}
+
+async function updatePrice() {
+  try {
+    response = await axios.get('https://api.exchangerate.host/convert?from=USD&to=HTG')
+    const rate = parseInt(response.data.result * 1000)
+
+    if (rate && rate > 0) {
+      const tx = await dappContract.changePriceSOS(rate)
+      const resp = await tx.wait()
+      console.log(resp)
+    }
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+setInterval(() => {
+  updatePrice()
+}, 1000 * 60 * 60 * 12)
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`)
 })
